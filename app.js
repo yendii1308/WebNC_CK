@@ -3,11 +3,13 @@ var express = require('express');
 var path = require('path');
 var cookieParser = require('cookie-parser');
 var logger = require('morgan');
+var session = require('express-session');
 
 var indexRouter = require('./routes/index');
 var usersRouter = require('./routes/users');
 
 var app = express();
+var db = require('./db');
 
 //------------------------------------------------------------------------------------------------------------------------------
 
@@ -15,7 +17,7 @@ var app = express();
 // Optional. You will see this name in eg. 'ps' or 'top' command
 process.title = 'node-chat';
 // Port where we'll run the websocket server
-var webSocketsServerPort = 1337;
+
 // websocket and http servers
 var webSocketServer = require('websocket').server;
 var http = require('http');
@@ -41,14 +43,8 @@ colors.sort(function(a,b) { return Math.random() > 0.5; } );
 /**
  * HTTP server
  */
-var server = http.createServer(function(request, response) {
-  // Not important for us. We're writing WebSocket server,
-  // not HTTP server
-});
-server.listen(webSocketsServerPort, function() {
-  console.log((new Date()) + " Server is listening on port "
-      + webSocketsServerPort);
-});
+var server = http.createServer(app);
+
 /**
  * WebSocket server
  */
@@ -84,6 +80,7 @@ wsServer.on('request', function(request) {
      if (userName === false) {
         // remember user name
         userName = htmlEntities(message.utf8Data);
+        //userName = request.cookie.user_name;
         // get random color and send it back to the user
         userColor = colors.shift();
         connection.sendUTF(
@@ -131,11 +128,25 @@ app.set('view engine', 'hbs');
 app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-app.use(cookieParser());
+app.use(cookieParser("thisiskey"));
 app.use(express.static(path.join(__dirname, 'public')));
+
+app.use(session({
+  resave: false,
+  saveUninitialized: true,
+  secret: 'SECRET'
+}));
+
 
 app.use('/', indexRouter);
 app.use('/users', usersRouter);
+app.use('/login', indexRouter);
+
+
+app.get('/logout', function(req, res){
+  req.logout();
+  res.redirect('/');
+});
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
@@ -154,3 +165,8 @@ app.use(function(err, req, res, next) {
 });
 
 module.exports = app;
+var webSocketsServerPort = process.env.PORT || 1337;
+server.listen(webSocketsServerPort, function() {
+  console.log((new Date()) + " Server is listening on port "
+      + webSocketsServerPort);
+});
